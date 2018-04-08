@@ -25,8 +25,9 @@ const log = new Log("MatrixRoomHandler");
 import { DbRoomStore, MatrixStoreRoom, RemoteStoreRoom } from "./db/roomstore";
 import { Appservice, Intent, IApplicationServiceProtocol } from "matrix-bot-sdk";
 
-const ICON_URL = "https://matrix.org/_matrix/media/r0/download/matrix.org/mlxoESwIsTbJrfXyAAogrNxA";
+const ICON_URL = "https://t2bot.io/_matrix/media/r0/download/matrix.org/mlxoESwIsTbJrfXyAAogrNxA";
 /* tslint:disable:no-magic-numbers */
+const JOIN_DELAY = 6000;
 const HTTP_UNSUPPORTED = 501;
 const ROOM_NAME_PARTS = 2;
 const PROVISIONING_DEFAULT_POWER_LEVEL = 50;
