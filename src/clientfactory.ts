@@ -45,6 +45,7 @@ export class DiscordClientFactory {
             ws: {
                 intents: this.config.usePrivilegedIntents ? Intents.ALL : Intents.NON_PRIVILEGED,
             },
+            shardCount: this.config.shards,
         });
 
         const waitPromise = new Promise((resolve, reject) => {

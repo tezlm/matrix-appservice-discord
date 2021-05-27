@@ -40,6 +40,8 @@ properties:
             type: "string"
           usePrivilegedIntents:
             type: "boolean"
+          shards:
+            type: "number"
     logging:
         type: "object"
         properties:
