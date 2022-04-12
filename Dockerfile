@@ -1,7 +1,8 @@
 FROM node:14-alpine AS BUILD
 COPY . /tmp/src
 # install some dependencies needed for the build process
-RUN apk add --no-cache -t build-deps make gcc g++ python ca-certificates libc-dev wget git
+RUN apk update
+RUN apk add --no-cache -t build-deps make gcc g++ python3 ca-certificates libc-dev wget git
 RUN cd /tmp/src \
     && npm install \
     && npm run build
