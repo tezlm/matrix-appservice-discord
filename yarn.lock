@@ -687,9 +687,9 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-"better-discord.js@github:t2bot/better-discord.js#140b795b37511e450de9a3d1053cb76952b2fb5d":
+"better-discord.js@github:t2bot/better-discord.js#f325c025771d733fb23629a60a575c72083df110":
   version "12.5.1"
-  resolved "https://codeload.github.com/t2bot/better-discord.js/tar.gz/140b795b37511e450de9a3d1053cb76952b2fb5d"
+  resolved "https://codeload.github.com/t2bot/better-discord.js/tar.gz/f325c025771d733fb23629a60a575c72083df110"
   dependencies:
     "@discordjs/collection" "^0.1.6"
     "@discordjs/form-data" "^3.0.1"
@@ -2395,7 +2395,7 @@ matrix-discord-parser@0.1.5:
   resolved "https://registry.yarnpkg.com/matrix-discord-parser/-/matrix-discord-parser-0.1.5.tgz#dd6a481a569567e8e30d70599d4dcb173261504c"
   integrity sha512-SilBNcNeJCrL6XEHVfbOhupNJICFdyFWfwv85Wtyh1Xxc0XPv4zK/gpEPogVeuKJD3TE0KT4iHq0nLgUJ8GBiQ==
   dependencies:
-    discord-markdown "github:Sorunome/discord-markdown#7958a03a952ed02cbd588b09eb04bc070b3a11f2"
+    discord-markdown "git://github.com/Sorunome/discord-markdown.git#7958a03a952ed02cbd588b09eb04bc070b3a11f2"
     escape-html "^1.0.3"
     got "^11.6.0"
     highlight.js "^9.18.1"
