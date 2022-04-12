@@ -4,8 +4,8 @@ COPY . /tmp/src
 RUN apk update
 RUN apk add --no-cache -t build-deps make gcc g++ python3 ca-certificates libc-dev wget git
 RUN cd /tmp/src \
-    && npm install \
-    && npm run build
+    && yarn install \
+    && yarn build
 
 FROM node:14-alpine
 ENV NODE_ENV=production
