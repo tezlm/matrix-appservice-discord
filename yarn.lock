@@ -687,9 +687,9 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-"better-discord.js@github:t2bot/better-discord.js#8fa3c45f8c14ade1e06cf9d131e1f997c446e397":
+"better-discord.js@github:t2bot/better-discord.js#024665909710579f7f8de498eb1d317d85aecce0":
   version "12.5.1"
-  resolved "https://codeload.github.com/t2bot/better-discord.js/tar.gz/8fa3c45f8c14ade1e06cf9d131e1f997c446e397"
+  resolved "https://codeload.github.com/t2bot/better-discord.js/tar.gz/024665909710579f7f8de498eb1d317d85aecce0"
   dependencies:
     "@discordjs/collection" "^0.1.6"
     "@discordjs/form-data" "^3.0.1"
