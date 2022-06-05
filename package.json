@@ -36,7 +36,7 @@
   },
   "homepage": "https://github.com/Half-Shot/matrix-appservice-discord#readme",
   "dependencies": {
-    "better-discord.js": "github:t2bot/better-discord.js#eac98fc7210158a42494da48c33bdf6d8cc78e37",
+    "better-discord.js": "github:t2bot/better-discord.js#8fa3c45f8c14ade1e06cf9d131e1f997c446e397",
     "better-sqlite3": "^7.1.0",
     "command-line-args": "^5.1.1",
     "command-line-usage": "^6.1.0",
