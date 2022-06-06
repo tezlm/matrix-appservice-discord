@@ -257,7 +257,7 @@ export class UserSyncroniser {
             userState.createUser = true;
             userState.displayName = displayName;
             if (discordUser.avatar) {
-                userState.avatarUrl = discordUser.avatarURL();
+                userState.avatarUrl = discordUser.avatarURL({ format: 'png' });
                 userState.avatarId = discordUser.avatar;
             }
             return userState;
@@ -270,10 +270,10 @@ export class UserSyncroniser {
         }
 
         const oldAvatarUrl = remoteUser.avatarurl;
-        if (oldAvatarUrl !== discordUser.avatarURL()) {
+        if (oldAvatarUrl !== discordUser.avatarURL({ format: 'png' })) {
             log.verbose(`User ${discordUser.id} avatarurl should be updated`);
             if (discordUser.avatar) {
-                userState.avatarUrl = discordUser.avatarURL();
+                userState.avatarUrl = discordUser.avatarURL({ format: 'png' });
                 userState.avatarId = discordUser.avatar;
             } else {
                 userState.removeAvatar = true;
