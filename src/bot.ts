@@ -41,7 +41,7 @@ import { BridgeBlocker, UserActivityState, UserActivityTracker } from "matrix-ap
 const log = new Log("DiscordBot");
 
 const MIN_PRESENCE_UPDATE_DELAY = 250;
-const TYPING_TIMEOUT_MS = 30 * 1000;
+const TYPING_TIMEOUT_MS = 15 * 1000;
 const CACHE_LIFETIME = 90000;
 
 // how often do we retry to connect on startup
@@ -761,21 +761,24 @@ export class DiscordBot {
         }
 
         if (member) {
-            let rooms: string[] = [];
-            await Util.AsyncForEach(guild.channels.cache.array(), async (channel) => {
-                if (channel.type !== "text" || !channel.members.has(member.id)) {
-                    return;
-                }
-                try {
-                    rooms = rooms.concat(await this.channelSync.GetRoomIdsFromChannel(channel));
-                } catch (e) { } // no bridged rooms for this channel
+            const rooms = (await this.store.roomStore.getEntriesByRemoteRoomData({
+                discord_guild: guild.id,
+            })).filter(room => {
+                const channelId = room.remote?.data.discord_channel;
+                if (!channelId) return false;
+                const channel = guild.channels.cache.get(channelId);
+                if (!channel) return false;
+                if (channel.type !== "text" || !channel.members.has(member.id)) return false;
+                return true;
             });
             if (rooms.length === 0) {
                 log.verbose(`No rooms were found for this guild and member (guild:${guild.id} member:${member.id})`);
                 throw new Error("Room(s) not found.");
             }
-            this.roomIdsForGuildCache.set(`${guild.id}:${guild.member}`, {roomIds: rooms, ts: Date.now()});
-            return rooms;
+
+            const roomIds = rooms.map((room) => room.matrix!.getId());
+            this.roomIdsForGuildCache.set(`${guild.id}:${guild.member}`, {roomIds, ts: Date.now()});
+            return roomIds;
         } else {
             const rooms = await this.store.roomStore.getEntriesByRemoteRoomData({
                 discord_guild: guild.id,
@@ -1054,6 +1057,8 @@ export class DiscordBot {
                         fileMime,
                         attachment.name || "",
                     );
+                    // celery.eu.org has a custom discord proxy, this won't work on normal servers
+                    // const mxcUrl = `mxc://celery.eu.org/discord-${attachment.url.replace(/.+?attachments\/(.+)/, "$1").replace(/\//g, "-")}`;
                     const type = fileMime.split("/")[0];
                     let msgtype = {
                         audio: "m.audio",
