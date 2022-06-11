@@ -238,7 +238,7 @@ export class UserSyncroniser {
             // id can have multiple different usernames set. This way we don't spam
             // userstate changes
 
-            mxidExtra = `_${Util.ParseMxid(`@${discordUser.username}`).localpart}`;
+            mxidExtra = `_${Util.NameForWebhook(discordUser.username)}`;
         }
         const userState: IUserState = Object.assign({}, DEFAULT_USER_STATE, {
             id: discordUser.id + mxidExtra,

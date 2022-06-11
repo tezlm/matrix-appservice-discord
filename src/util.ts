@@ -358,6 +358,10 @@ export class Util {
         return haveLevel >= requiredLevel;
     }
 
+    public static NameForWebhook(name: string) {
+        return Util.EscapeStringForUserId(name);
+    }
+
     public static ParseMxid(unescapedMxid: string, escape: boolean = true) {
         const RADIX = 16;
         const parts = unescapedMxid.substring(1).split(":");

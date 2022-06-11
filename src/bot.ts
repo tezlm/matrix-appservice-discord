@@ -146,7 +146,7 @@ export class DiscordBot {
                 throw Error("Couldn't get intent for Discord member, name was null");
             }
             // TODO: We need to sanitize name
-            return this.bridge.getIntentForSuffix(`${webhookID}_${Util.EscapeStringForUserId(name)}`);
+            return this.bridge.getIntentForSuffix(`${webhookID}_${Util.NameForWebhook(name)}`);
         }
         return this.bridge.getIntentForSuffix(member.id);
     }
