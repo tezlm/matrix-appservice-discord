@@ -122,6 +122,7 @@ export class UserSyncroniser {
             const rUser = await this.userStore.getRemoteUser(userState.id);
             remoteUser = rUser ? rUser : new RemoteUser(userState.id);
         }
+
         await intent.ensureRegistered();
 
         if (userState.displayName !== null) {
@@ -199,14 +200,20 @@ export class UserSyncroniser {
             // Nothing to do. Quitting
             return;
         }
+        const intent = this.bridge.getIntentForUserId(memberState.mxUserId);
+        if (!(await intent.getJoinedRooms()).includes(roomId)) {
+            log.warn("wont update state for user who is not in this room");
+            return;
+        }
+
         const remoteUser = await this.userStore.getRemoteUser(memberState.id);
+        if (!remoteUser) return;
         let avatar = "";
         if (remoteUser) {
             avatar = remoteUser.avatarurlMxc || "";
         } else {
             log.warn("Remote user wasn't found, using blank avatar");
         }
-        const intent = this.bridge.getIntentForUserId(memberState.mxUserId);
         /* The intent class tries to be smart and deny a state update for <PL50 users.
            Obviously a user can change their own state so we use the client instead. */
         await intent.underlyingClient.sendStateEvent(roomId, "m.room.member", memberState.mxUserId, {

@@ -71,17 +71,7 @@ export class MatrixMessageProcessor {
     ): IMatrixMessageParserCallbacks {
         return {
             canNotifyRoom: async () => {
-                if (!params || !params.mxClient || !params.roomId || !params.userId) {
-                    return false;
-                }
-                return await Util.CheckMatrixPermission(
-                    params.mxClient,
-                    params.userId,
-                    params.roomId,
-                    DEFAULT_ROOM_NOTIFY_POWER_LEVEL,
-                    "notifications",
-                    "room",
-                );
+                return false; // nope
             },
             getChannelId: async (mxid: string) => {
                 const CHANNEL_REGEX = /^#_discord_[0-9]*_([0-9]*):/;
