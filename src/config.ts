@@ -93,7 +93,7 @@ class DiscordBridgeConfigBridge {
     public enableSelfServiceBridging: boolean;
     public disablePortalBridging: boolean;
     public disableReadReceipts: boolean;
-    public disableEveryoneMention: boolean = false;
+    public disableEveryoneMention: boolean = true;
     public disableHereMention: boolean = false;
     public disableJoinLeaveNotifications: boolean = false;
     public disableInviteNotifications: boolean = false;
@@ -127,7 +127,8 @@ export class DiscordBridgeConfigLogging {
 
 class DiscordBridgeConfigRoom {
     public defaultVisibility: string;
-    public kickFor: number = 30000;
+//    public kickFor: number = 30000;
+    public kickFor: number = 0;
 }
 
 class DiscordBridgeConfigChannel {

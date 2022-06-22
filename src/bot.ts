@@ -626,6 +626,7 @@ export class DiscordBot {
                     embeds,
                     files: opts.files,
                     username: embed!.author!.name,
+                    allowedMentions: { parse: ["users"] },
                 });
             } else {
                 opts.embed = this.prepareEmbedSetBot(embedSet);
@@ -775,7 +776,6 @@ export class DiscordBot {
                 log.verbose(`No rooms were found for this guild and member (guild:${guild.id} member:${member.id})`);
                 throw new Error("Room(s) not found.");
             }
-
             const roomIds = rooms.map((room) => room.matrix!.getId());
             this.roomIdsForGuildCache.set(`${guild.id}:${guild.member}`, {roomIds, ts: Date.now()});
             return roomIds;
@@ -1020,7 +1020,7 @@ export class DiscordBot {
                 return;
             }
         }
-
+        
         // check if it is a command to process by the bot itself
         if (msg.content.startsWith("!matrix")) {
             await this.discordCommandHandler.Process(msg);
@@ -1043,6 +1043,15 @@ export class DiscordBot {
         }
         try {
             const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookID);
+            // stop typing
+            await intent.ensureRegistered();
+            rooms.map((roomId) => intent.underlyingClient.setTyping(roomId, false));
+            const typingKey = `${msg.author.id}:${msg.channel.id}`;
+            if (this.typingTimers[typingKey]) {
+                clearTimeout(this.typingTimers[typingKey]);
+                delete this.typingTimers[typingKey];
+            }
+            
             // Check Attachements
             if (!editEventId) {
                 // on discord you can't edit in images, you can only edit text
@@ -1052,13 +1061,13 @@ export class DiscordBot {
                     const content = await Util.DownloadFile(attachment.url);
                     const fileMime = content.mimeType || mime.getType(attachment.name || "")
                         || "application/octet-stream";
-                    const mxcUrl = await intent.underlyingClient.uploadContent(
-                        content.buffer,
-                        fileMime,
-                        attachment.name || "",
-                    );
-                    // celery.eu.org has a custom discord proxy, this won't work on normal servers
-                    // const mxcUrl = `mxc://celery.eu.org/discord-${attachment.url.replace(/.+?attachments\/(.+)/, "$1").replace(/\//g, "-")}`;
+                    // const mxcUrl = await intent.underlyingClient.uploadContent(
+                    //     content.buffer,
+                    //     fileMime,
+                    //     attachment.name || "",
+                    // );
+                    // epically trolled
+                    const mxcUrl = `mxc://celery.eu.org/discord-attachment-${attachment.url.replace(/.+?attachments\/(.+)/, "$1").replace(/\//g, "-")}`;
                     const type = fileMime.split("/")[0];
                     let msgtype = {
                         audio: "m.audio",

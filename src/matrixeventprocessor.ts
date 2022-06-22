@@ -209,7 +209,7 @@ export class MatrixEventProcessor {
             embedSet.imageEmbed = file as Discord.MessageEmbed;
         }
 
-    // Throws an `Unstable.ForeignNetworkError` when sending the message fails.
+        // Throws an `Unstable.ForeignNetworkError` when sending the message fails.
         if (editEventId) {
             await this.discord.edit(embedSet, opts, roomLookup, event, editEventId);
         } else {
@@ -224,7 +224,8 @@ export class MatrixEventProcessor {
     public async ProcessStateEvent(event: IMatrixEvent) {
         log.verbose(`Got state event from ${event.room_id} ${event.type}`);
 
-        const SUPPORTED_EVENTS = ["m.room.member", "m.room.name", "m.room.topic"];
+        // const SUPPORTED_EVENTS = ["m.room.member", "m.room.name", "m.room.topic"];
+        const SUPPORTED_EVENTS = ["m.room.member"];
         if (!SUPPORTED_EVENTS.includes(event.type)) {
             log.verbose(`${event.event_id} ${event.type} is not displayable.`);
             return;
@@ -235,13 +236,13 @@ export class MatrixEventProcessor {
             return;
         }
 
-        let msg = `\`${event.sender}\` `;
+        let msg = `ayo \`${event.sender}\` `;
 
         const allowJoinLeave = !this.config.bridge.disableJoinLeaveNotifications;
         const allowInvite = !this.config.bridge.disableInviteNotifications;
 
         if (event.type === "m.room.name") {
-            msg += `set the name to \`${event.content!.name}\``;
+            msg += `set the room name to \`${event.content!.name}\``;
         } else if (event.type === "m.room.topic") {
             msg += `set the topic to \`${event.content!.topic}\``;
         } else if (event.type === "m.room.member") {
@@ -266,7 +267,8 @@ export class MatrixEventProcessor {
             } else if (membership === "invite" && allowInvite) {
                 msg += `invited \`${event.state_key}\` to the room`;
             } else if (membership === "leave" && event.state_key !== event.sender) {
-                msg += `kicked \`${event.state_key}\` from the room`;
+                const banUnban = event.unsigned.prev_content.membership === "ban" ? "unbanned" : "kicked";
+                msg += `${banUnban} \`${event.state_key}\` from the room`;
             } else if (membership === "leave" && allowJoinLeave) {
                 msg += "left the room";
             } else if (membership === "ban") {
@@ -277,10 +279,9 @@ export class MatrixEventProcessor {
             }
         }
 
-        msg += " on Matrix.";
-        // const channel = await this.discord.GetChannelFromRoomId(event.room_id) as Discord.TextChannel;
-        // await this.discord.sendAsBot(msg, channel, event);
-        // await this.sendReadReceipt(event);
+        const channel = await this.discord.GetChannelFromRoomId(event.room_id) as Discord.TextChannel;
+        await this.discord.sendAsBot(msg, channel, event);
+        await this.sendReadReceipt(event);
     }
 
     public async EventToEmbed(
@@ -304,6 +305,7 @@ export class MatrixEventProcessor {
         }
 
         const messageEmbed = new Discord.MessageEmbed();
+        // messageEmbed.setDescription(this.HasAttachment(event) ? "" : body);
         messageEmbed.setDescription(body);
         await this.SetEmbedAuthor(messageEmbed, event.sender, profile);
         const replyEmbed = getReply ? (await this.GetEmbedForReply(event, channel)) : undefined;

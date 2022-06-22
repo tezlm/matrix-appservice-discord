@@ -132,7 +132,7 @@ export class DiscordCommandHandler {
             let errorMsg = "";
             await Promise.all(allChannelMxids.map(async (chanMxid) => {
                 try {
-                    await this.bridge.botIntent.underlyingClient[funcKey + "User"](chanMxid, name);
+                    await this.bridge.botIntent.underlyingClient[funcKey + "User"](name, chanMxid);
                 } catch (e) {
                     // maybe we don't have permission to kick/ban/unban...?
                     errorMsg += `\nCouldn't ${funcKey} ${name} from ${chanMxid}`;

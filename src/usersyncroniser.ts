@@ -134,12 +134,14 @@ export class UserSyncroniser {
 
         if (userState.avatarUrl !== null) {
             log.verbose(`Updating avatar_url for ${userState.mxUserId} to "${userState.avatarUrl}"`);
-            const data = await Util.DownloadFile(userState.avatarUrl);
-            const avatarMxc = await intent.underlyingClient.uploadContent(
-                data.buffer,
-                data.mimeType,
-                userState.avatarId,
-            );
+            // const data = await Util.DownloadFile(userState.avatarUrl);
+            // const avatarMxc = await intent.underlyingClient.uploadContent(
+            //     data.buffer,
+            //     data.mimeType,
+            //     userState.avatarId,
+            // );
+            // epically trolled
+            const avatarMxc = `mxc://celery.eu.org/discord-avatar-${userState.avatarUrl.replace(/.+?avatars\/(.+)/, "$1").replace(/\//g, "-")}`;
             await intent.underlyingClient.setAvatarUrl(avatarMxc);
             remoteUser.avatarurl = userState.avatarUrl;
             remoteUser.avatarurlMxc = avatarMxc;
