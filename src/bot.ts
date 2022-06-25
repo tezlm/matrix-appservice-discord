@@ -28,7 +28,7 @@ import { UserSyncroniser } from "./usersyncroniser";
 import { ChannelSyncroniser } from "./channelsyncroniser";
 import { MatrixRoomHandler } from "./matrixroomhandler";
 import { Log } from "./log";
-import * as Discord from "better-discord.js";
+import * as Discord from "discord.js";
 import * as mime from "mime";
 import { IMatrixEvent, IMatrixMediaInfo, IMatrixMessage } from "./matrixtypes";
 import { Appservice, Intent, MatrixClient } from "matrix-bot-sdk";
@@ -229,7 +229,7 @@ export class DiscordBot {
         }
         const client = await this.clientFactory.getClient();
         if (!this.config.bridge.disableTypingNotifications) {
-            client.on("typingStart", async (channel, user) => {
+            client.on("typingStart", async ({ channel, user }) => {
                 try {
                     await this.OnTyping(channel, user, true);
                 } catch (err) { log.warning("Exception thrown while handling \"typingStart\" event", err); }
@@ -470,7 +470,7 @@ export class DiscordBot {
                 throw new Error(`Guild "${server}" not found`);
             }
             const channel = guild.channels.resolve(room);
-            if (channel && channel.type === "text") {
+            if (channel && channel.type === "GUILD_TEXT") {
                 if (hasSender) {
                     const permissions = guild.me && channel.permissionsFor(guild.me);
                     if (!permissions || !permissions.has("VIEW_CHANNEL") || !permissions.has("SEND_MESSAGES")) {
@@ -532,7 +532,7 @@ export class DiscordBot {
                     await oldMsg.edit(this.prepareEmbedSetUserAccount(embedSet), opts);
                 } else {
                     opts.embed = this.prepareEmbedSetBotAccount(embedSet);
-                    await oldMsg.edit(embed.description, opts);
+                    await oldMsg.edit({ content: embed.description, ...opts });
                 }
                 return;
             } catch (err) {
@@ -769,7 +769,7 @@ export class DiscordBot {
                 if (!channelId) return false;
                 const channel = guild.channels.cache.get(channelId);
                 if (!channel) return false;
-                if (channel.type !== "text" || !channel.members.has(member.id)) return false;
+                if (channel.type !== "GUILD_TEXT" || !channel.members.has(member.id)) return false;
                 return true;
             });
             if (rooms.length === 0) {
@@ -777,7 +777,7 @@ export class DiscordBot {
                 throw new Error("Room(s) not found.");
             }
             const roomIds = rooms.map((room) => room.matrix!.getId());
-            this.roomIdsForGuildCache.set(`${guild.id}:${guild.member}`, {roomIds, ts: Date.now()});
+            this.roomIdsForGuildCache.set(`${guild.id}:${member.id}`, {roomIds, ts: Date.now()});
             return roomIds;
         } else {
             const rooms = await this.store.roomStore.getEntriesByRemoteRoomData({
@@ -806,7 +806,7 @@ export class DiscordBot {
             log.error("Failed to get channel for ", roomId, ex);
             return;
         }
-        if (channel.type !== "text") {
+        if (channel.type !== "GUILD_TEXT") {
             log.warn("Channel was not a text channel");
             return;
         }
@@ -1057,7 +1057,8 @@ export class DiscordBot {
                 // on discord you can't edit in images, you can only edit text
                 // so it is safe to only check image upload stuff if we don't have
                 // an edit
-                await Util.AsyncForEach(msg.attachments.array(), async (attachment) => {
+                await Util.AsyncForEach([...msg.attachments.array(), ...msg.stickers.array()], async (attachment) => {
+                    const isSticker = attachment instanceof Discord.Sticker;
                     const content = await Util.DownloadFile(attachment.url);
                     const fileMime = content.mimeType || mime.getType(attachment.name || "")
                         || "application/octet-stream";
@@ -1067,19 +1068,17 @@ export class DiscordBot {
                     //     attachment.name || "",
                     // );
                     // epically trolled
-                    const mxcUrl = `mxc://celery.eu.org/discord-attachment-${attachment.url.replace(/.+?attachments\/(.+)/, "$1").replace(/\//g, "-")}`;
-                    const type = fileMime.split("/")[0];
-                    let msgtype = {
+                    const mxcUrl = isSticker
+                        ? `mxc://celery.eu.org/discord-sticker-${attachment.url.replace(/.+?stickers\/(.+)/, "$1").replace(/\//g, "-")}`
+                        : `mxc://celery.eu.org/discord-attachment-${attachment.url.replace(/.+?attachments\/(.+)/, "$1").replace(/\//g, "-")}`;
+                    const msgtype = (isSticker ? "m.sticker" : {
                         audio: "m.audio",
                         image: "m.image",
                         video: "m.video",
-                    }[type];
-                    if (!msgtype) {
-                        msgtype = "m.file";
-                    }
+                    }[fileMime.split("/")[0]]) ?? "m.file";
                     const info = {
                         mimetype: fileMime,
-                        size: attachment.size,
+                        size: content.buffer.length,
                     } as IMatrixMediaInfo;
                     if (msgtype === "m.image" || msgtype === "m.video") {
                         info.w = attachment.width!;
