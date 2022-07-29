@@ -69,7 +69,7 @@ export class PrometheusBridgeMetrics implements IBridgeMetrics {
     private httpServer: http.Server;
 
     public init(as: Appservice, config: DiscordBridgeConfigMetrics) {
-        promClient.collectDefaultMetrics();
+        // promClient.collectDefaultMetrics();
         // TODO: Bind this for every user.
         this.httpServer = http.createServer((req, res) => {
             if (req.method !== "GET" || req.url !== "/metrics") {
