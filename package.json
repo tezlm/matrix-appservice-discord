@@ -36,6 +36,7 @@
   },
   "homepage": "https://github.com/Half-Shot/matrix-appservice-discord#readme",
   "dependencies": {
+    "@mx-puppet/matrix-discord-parser": "0.1.10",
     "better-discord.js": "github:t2bot/better-discord.js#024665909710579f7f8de498eb1d317d85aecce0",
     "better-sqlite3": "^7.1.0",
     "command-line-args": "^5.1.1",
@@ -45,7 +46,6 @@
     "js-yaml": "^3.14.0",
     "marked": "^1.2.2",
     "matrix-bot-sdk": "0.5.11",
-    "matrix-discord-parser": "0.1.5",
     "mime": "^2.4.6",
     "node-html-parser": "^1.2.19",
     "p-queue": "^6.4.0",
