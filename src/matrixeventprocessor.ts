@@ -92,8 +92,8 @@ export class MatrixEventProcessor {
      */
     public async OnEvent(event: IMatrixEvent, rooms: IRoomStoreEntry[]): Promise<void> {
         const remoteRoom = rooms[0];
-        if (event.unsigned.age > AGE_LIMIT) {
-            log.info(`Skipping event due to age ${event.unsigned.age} > ${AGE_LIMIT}`);
+        if (event.unsigned?.age > AGE_LIMIT) {
+            log.info(`Skipping event due to age ${event.unsigned?.age} > ${AGE_LIMIT}`);
             // throw new Unstable.EventTooOldError(
             //     `Skipping event due to age ${event.unsigned.age} > ${AGE_LIMIT}`,
             // );

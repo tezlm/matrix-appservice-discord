@@ -626,7 +626,7 @@ export class DiscordBot {
                     embeds,
                     files: opts.files,
                     username: embed!.author!.name,
-                    allowedMentions: { parse: ["users"] },
+                    allowedMentions: { parse: ["users", "roles"] },
                 });
             } else {
                 opts.embed = this.prepareEmbedSetBot(embedSet);
