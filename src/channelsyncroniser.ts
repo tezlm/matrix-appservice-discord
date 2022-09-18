@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as Discord from "better-discord.js";
+import * as Discord from "discord.js";
 import { DiscordBot } from "./bot";
 import { Util } from "./util";
 import { DiscordBridgeConfig, DiscordBridgeConfigChannelDeleteOptions } from "./config";
@@ -67,7 +67,7 @@ export class ChannelSyncroniser {
     }
 
     public async OnUpdate(channel: Discord.Channel) {
-        if (channel.type !== "text") {
+        if (channel.type !== "GUILD_TEXT") {
             return; // Not supported for now
         }
         const channelState = await this.GetChannelUpdateState(channel as Discord.TextChannel);
@@ -350,7 +350,7 @@ export class ChannelSyncroniser {
 
         await this.roomStore.upsertEntry(entry);
         if (options.ghostsLeave) {
-            for (const member of channel.members.array()) {
+            for (const member of channel.members.values()) {
                 try {
                     const mIntent = this.bot.GetIntentFromDiscordMember(member);
                     await client.leaveRoom(roomId);

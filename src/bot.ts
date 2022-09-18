@@ -188,16 +188,16 @@ export class DiscordBot {
     }
 
     public GetIntentFromDiscordMember(member: Discord.GuildMember | Discord.PartialUser | Discord.User,
-                                      webhookID: string|null = null): Intent {
-        if (webhookID) {
-            // webhookID and user IDs are the same, they are unique, so no need to prefix _webhook_
+                                      webhookId: string|null = null): Intent {
+        if (webhookId) {
+            // webhookId and user IDs are the same, they are unique, so no need to prefix _webhook_
             const name = member instanceof Discord.GuildMember ? member.user.username : member.username;
             if (!name) {
                 log.error("Couldn't get intent for Discord member, name was null:", member);
                 throw Error("Couldn't get intent for Discord member, name was null");
             }
             // TODO: We need to sanitize name
-            return this.bridge.getIntentForSuffix(`${webhookID}_${Util.NameForWebhook(name)}`);
+            return this.bridge.getIntentForSuffix(`${webhookId}_${Util.NameForWebhook(name)}`);
         }
         return this.bridge.getIntentForSuffix(member.id);
     }
@@ -388,7 +388,7 @@ export class DiscordBot {
             this.bot.guilds.cache.forEach((guild) => {
                 guild.members.cache.forEach((member) => {
                     if (member.id !== this.GetBotId()) {
-                        this.presenceHandler.EnqueueUser(member.user.presence);
+                        this.presenceHandler.EnqueueUser(member.presence);
                     }
                 });
             });
@@ -433,7 +433,7 @@ export class DiscordBot {
     }
 
     public GetGuilds(): Discord.Guild[] {
-        return this.bot.guilds.cache.array();
+        return [...this.bot.guilds.cache.values()];
     }
 
     public ThirdpartySearchForChannels(guildId: string, channelName: string): IThirdPartyLookup[] {
@@ -942,7 +942,7 @@ export class DiscordBot {
 
     private async SendMatrixMessage(matrixMsg: IDiscordMessageParserResult, chan: Discord.Channel,
                                     guild: Discord.Guild, author: Discord.User,
-                                    msgID: string): Promise<boolean> {
+                                    msgId: string): Promise<boolean> {
         const rooms = await this.channelSync.GetRoomIdsFromChannel(chan);
         const intent = this.GetIntentFromDiscordMember(author);
 
@@ -956,7 +956,7 @@ export class DiscordBot {
             this.lastEventIds[roomId] = eventId;
             const evt = new DbEvent();
             evt.MatrixId = `${eventId};${roomId}`;
-            evt.DiscordId = msgID;
+            evt.DiscordId = msgId;
             evt.ChannelId = chan.id;
             evt.GuildId = guild.id;
             await this.store.Insert(evt);
@@ -1009,10 +1009,10 @@ export class DiscordBot {
             return;
         }
         // Test for webhooks
-        if (msg.webhookID) {
+        if (msg.webhookId) {
             const webhook = (await chan.fetchWebhooks())
                             .filter((h) => h.name === "_matrix").first();
-            if (webhook && msg.webhookID === webhook.id) {
+            if (webhook && msg.webhookId === webhook.id) {
                 // Filter out our own webhook messages.
                 log.verbose("Not reflecting own webhook messages");
               // Filter out our own webhook messages.
@@ -1029,7 +1029,7 @@ export class DiscordBot {
         }
 
         // Update presence because sometimes discord misses people.
-        await this.userSync.OnUpdateUser(msg.author, Boolean(msg.webhookID));
+        await this.userSync.OnUpdateUser(msg.author, Boolean(msg.webhookId));
         let rooms: string[];
         try {
             rooms = await this.channelSync.GetRoomIdsFromChannel(msg.channel);
@@ -1042,7 +1042,7 @@ export class DiscordBot {
             return null;
         }
         try {
-            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookID);
+            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookId);
             // stop typing
             await intent.ensureRegistered();
             rooms.map((roomId) => intent.underlyingClient.setTyping(roomId, false));
@@ -1057,7 +1057,7 @@ export class DiscordBot {
                 // on discord you can't edit in images, you can only edit text
                 // so it is safe to only check image upload stuff if we don't have
                 // an edit
-                await Util.AsyncForEach([...msg.attachments.array(), ...msg.stickers.array()], async (attachment) => {
+                await Util.AsyncForEach(msg.attachments.values().concat(msg.stickers.values()), async (attachment: Discord.Attachment | Discord.Sticker) => {
                     const isSticker = attachment instanceof Discord.Sticker;
                     const content = await Util.DownloadFile(attachment.url);
                     const fileMime = content.mimeType || mime.getType(attachment.name || "")
@@ -1120,7 +1120,7 @@ export class DiscordBot {
                     msgtype: result.msgtype,
                 };
                 if (msg.reference) {
-                    const storeEvent = await this.store.Get(DbEvent, {discord_id: msg.reference?.messageID})
+                    const storeEvent = await this.store.Get(DbEvent, {discord_id: msg.reference?.messageId})
                     if (storeEvent && storeEvent.Result)
                     {
                         while(storeEvent.Next())
@@ -1169,10 +1169,10 @@ export class DiscordBot {
                         log.error("Failed to send message into room.", e);
                         return;
                     }
-                    if (msg.member && !msg.webhookID) {
+                    if (msg.member && !msg.webhookId) {
                         await this.userSync.JoinRoom(msg.member, room);
                     } else {
-                        await this.userSync.JoinRoom(msg.author, room, Boolean(msg.webhookID));
+                        await this.userSync.JoinRoom(msg.author, room, Boolean(msg.webhookId));
                     }
                     res = await trySend();
                     await afterSend(res);
@@ -1212,7 +1212,7 @@ export class DiscordBot {
         }
         while (storeEvent.Next()) {
             log.info(`Deleting discord msg ${storeEvent.DiscordId}`);
-            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookID);
+            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookId);
             await intent.ensureRegistered();
             this.userActivity.updateUserActivity(intent.userId);
             const matrixIds = storeEvent.MatrixId.split(";");

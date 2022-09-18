@@ -16,7 +16,7 @@ limitations under the License.
 
 import { DiscordBridgeConfigAuth } from "./config";
 import { DiscordStore } from "./store";
-import { Client as DiscordClient, Intents, TextChannel } from "better-discord.js";
+import { Client as DiscordClient, Intents, TextChannel } from "discord.js";
 import { Log } from "./log";
 import { MetricPeg } from "./metrics";
 
@@ -54,7 +54,7 @@ export class DiscordClientFactory {
         });
 
         try {
-            await this.botClient.login(this.config.botToken, true);
+            await this.botClient.login(this.config.botToken);
             log.info("Waiting for shardReady signal");
             await waitPromise;
             log.info("Got shardReady signal");
@@ -63,24 +63,6 @@ export class DiscordClientFactory {
             throw err;
         }
 
-    }
-
-    public async getDiscordId(token: string): Promise<string> {
-        const client = new DiscordClient({
-            fetchAllMembers: false,
-            messageCacheLifetime: 5,
-            ws: {
-                intents: Intents.NON_PRIVILEGED,
-            },
-        });
-
-        await client.login(token, false);
-        const id = client.user?.id;
-        client.destroy();
-        if (!id) {
-            throw Error("Client did not have a user object, cannot determine ID");
-        }
-        return id;
     }
 
     public async getClient(userId: string | null = null): Promise<DiscordClient> {
@@ -113,7 +95,7 @@ export class DiscordClientFactory {
         client.on("warn", (msg) => { jsLog.warn(msg); });
 
         try {
-            await client.login(token, false);
+            await client.login(token);
             log.verbose("Logged in. Storing ", userId);
             this.clients.set(userId, client);
             return client;

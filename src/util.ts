@@ -17,7 +17,7 @@ limitations under the License.
 import * as http from "http";
 import * as https from "https";
 import { Buffer } from "buffer";
-import { Permissions } from "better-discord.js";
+import { Permissions } from "discord.js";
 import { DiscordBridgeConfig } from "./config";
 import { IMatrixEvent } from "./matrixtypes";
 
@@ -119,7 +119,7 @@ export class Util {
             Permissions.FLAGS.MANAGE_MESSAGES!;
         /* tslint:enable:no-bitwise */
 
-        const clientId = config.auth.clientID;
+        const clientId = config.auth.clientId;
 
         return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&scope=bot&permissions=${perms}`;
     }
