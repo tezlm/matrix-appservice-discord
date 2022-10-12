@@ -342,19 +342,11 @@ export class DiscordBot {
 
         client.on("userUpdate", async (_, user) => {
             try {
-                if (!(user instanceof Discord.User)) {
-                    log.warn(`Ignoring update for ${user.username}. User was partial.`);
-                    return;
-                }
                 await this.userSync.OnUpdateUser(user);
             } catch (err) { log.error("Exception thrown while handling \"userUpdate\" event", err); }
         });
         client.on("guildMemberAdd", async (member) => {
             try {
-                if (!(member instanceof Discord.GuildMember)) {
-                    log.warn(`Ignoring update for ${member.guild.id} ${member.id}. User was partial.`);
-                    return;
-                }
                 await this.userSync.OnAddGuildMember(member);
             } catch (err) { log.error("Exception thrown while handling \"guildMemberAdd\" event", err); }
         });
@@ -369,10 +361,6 @@ export class DiscordBot {
         });
         client.on("guildMemberUpdate", async (_, member) => {
             try {
-                if (!(member instanceof Discord.GuildMember)) {
-                    log.warn(`Ignoring update for ${member.guild.id} ${member.id}. User was partial.`);
-                    return;
-                }
                 await this.userSync.OnUpdateGuildMember(member);
             } catch (err) { log.error("Exception thrown while handling \"guildMemberUpdate\" event", err); }
         });
