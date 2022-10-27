@@ -1291,7 +1291,7 @@ export class DiscordBot {
                     "m.relates_to": {
                         rel_type: "m.annotation",
                         event_id: matrixIds[0],
-                        key: reaction.emoji.id ? `mxc://celery.eu.org/discord-emoji-${reaction.emoji.id}.webp` : reaction.emoji.name,
+                        key: ("guild" in reaction.emoji) ? `mxc://celery.eu.org/discord-emojis-${reaction.emoji.id}.webp` : reaction.emoji.name,
                     },
                     ...(reaction.emoji.name && { shortcode: reaction.emoji.name })
                 });
