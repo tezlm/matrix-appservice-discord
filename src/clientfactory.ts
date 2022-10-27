@@ -40,7 +40,7 @@ export class DiscordClientFactory {
         // We just need to make sure we have a bearer token.
         // Create a new Bot client.
         this.botClient = new DiscordClient({
-            intents: ["GuildPresences", "GuildEmojisAndStickers", "GuildMessageReactions", "GuildMessages", "GuildWebhooks", "GuildMembers", "Guilds", "GuildMessageTyping"],
+            intents: ["GuildPresences", "GuildEmojisAndStickers", "GuildMessageReactions", "GuildMessages", "GuildWebhooks", "GuildMembers", "Guilds", "GuildMessageTyping", "MessageContent"],
             shardCount: this.config.shards,
         });
 

@@ -319,7 +319,7 @@ export class DiscordBot {
                 log.error("Exception thrown while handling \"messageUpdate\" event", err);
             }
         });
-        client.on("message", async (msg: Discord.Message) => {
+        client.on("messageCreate", async (msg: Discord.Message) => {
             try {
                 log.verbose(`Got incoming msg i:${msg.id} c:${msg.channel.id} g:${msg.guild?.id}`);
                 MetricPeg.get.registerRequest(msg.id);
@@ -649,6 +649,8 @@ export class DiscordBot {
                 MetricPeg.get.remoteCall("hook.send");
                 const embeds = this.prepareEmbedSetWebhook(embedSet);
                 msg = await hook.send({
+                    username: embed.data.author!.name,
+                    avatarURL: embed.data.author!.icon_url,
                     content: embed.data.description,
                     embeds,
                     files: opts.files,
@@ -1031,6 +1033,7 @@ export class DiscordBot {
             MetricPeg.get.requestOutcome(msg.id, true, "dropped");
             return; // Skip *our* messages
         }
+        
         const chan = msg.channel as Discord.TextChannel;
         if (msg.author.id === this.bot.user?.id) {
             // We don't support double bridging.
@@ -1038,6 +1041,7 @@ export class DiscordBot {
             MetricPeg.get.requestOutcome(msg.id, true, "dropped");
             return;
         }
+        
         // Test for webhooks
         if (msg.webhookId) {
             const webhook = (await chan.fetchWebhooks())
