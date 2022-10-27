@@ -230,9 +230,9 @@ export class DiscordBot {
         }
         const client = await this.clientFactory.getClient();
         if (!this.config.bridge.disableTypingNotifications) {
-            client.on("typingStart", async (channel, user) => {
+            client.on("typingStart", async (typing) => {
                 try {
-                    await this.OnTyping(channel, user, true);
+                    await this.OnTyping(typing.channel, typing.user, true);
                 } catch (err) { log.warning("Exception thrown while handling \"typingStart\" event", err); }
             });
         }
@@ -389,7 +389,7 @@ export class DiscordBot {
             this.bot.guilds.cache.forEach((guild) => {
                 guild.members.cache.forEach((member) => {
                     if (member.id !== this.GetBotId()) {
-                        this.presenceHandler.EnqueueUser(member.user.presence);
+                        if (member.presence) this.presenceHandler.EnqueueUser(member.presence);
                     }
                 });
             });
@@ -434,7 +434,7 @@ export class DiscordBot {
     }
 
     public GetGuilds(): Discord.Guild[] {
-        return this.bot.guilds.cache.array();
+        return [...this.bot.guilds.cache.values()];
     }
 
     public ThirdpartySearchForChannels(guildId: string, channelName: string): IThirdPartyLookup[] {
@@ -471,10 +471,10 @@ export class DiscordBot {
                 throw new Error(`Guild "${server}" not found`);
             }
             const channel = guild.channels.resolve(room);
-            if (channel && channel.type === "text") {
+            if (channel && channel instanceof Discord.TextChannel) {
                 if (hasSender) {
-                    const permissions = guild.me && channel.permissionsFor(guild.me);
-                    if (!permissions || !permissions.has("VIEW_CHANNEL") || !permissions.has("SEND_MESSAGES")) {
+                    const permissions = guild.members.me && channel.permissionsFor(guild.members.me);
+                    if (!permissions || !permissions.has("ViewChannel") || !permissions.has("SendMessages")) {
                         throw new Error(`Can't send into channel`);
                     }
                 }
@@ -513,7 +513,7 @@ export class DiscordBot {
      */
     public async edit(
         embedSet: IMatrixEventProcessorResult,
-        opts: Discord.MessageOptions,
+        opts: Discord.MessageCreateOptions,
         roomLookup: ChannelLookupResult,
         event: IMatrixEvent,
         editedEventId: string,
@@ -530,10 +530,15 @@ export class DiscordBot {
         if (!botUser) {
             try {
                 if (!roomLookup.canSendEmbeds) {
-                    await oldMsg.edit(this.prepareEmbedSetUserAccount(embedSet), opts);
+                    const embed = this.prepareEmbedSetBotAccount(embedSet);
+                    if (!opts.embeds) opts.embeds = [];
+                    opts.embeds.push(embed?.data!);
+                    await oldMsg.edit(opts);
                 } else {
-                    opts.embed = this.prepareEmbedSetBotAccount(embedSet);
-                    await oldMsg.edit(embed.description, opts);
+                    const embed = this.prepareEmbedSetBotAccount(embedSet);
+                    if (!opts.embeds) opts.embeds = [];
+                    opts.embeds.push(embed?.data!);
+                    await oldMsg.edit(opts);
                 }
                 return;
             } catch (err) {
@@ -547,11 +552,9 @@ export class DiscordBot {
                     // the edit may bridge over back to matrix otherwise
                     const embeds = this.prepareEmbedSetWebhook(embedSet);
                     hook.editMessage(oldMsg, {
-                        body: embed.description,
-                        avatarURL: embed!.author!.iconURL,
+                        content: embed.data.description ?? null,
                         embeds,
                         files: opts.files,
-                        username: embed!.author!.name,
                     })
                     this.channelLock.release(chan.id);
                 } else {
@@ -583,7 +586,7 @@ export class DiscordBot {
                         return;
                     }
                     const link = `https://discord.com/channels/${chan.guild.id}/${chan.id}/${editedEventId}`;
-                    embedSet.messageEmbed.description = `[Edit](${link}): ${embedSet.messageEmbed.description}`;
+                    embedSet.messageEmbed.setDescription(`[Edit](${link}): ${embedSet.messageEmbed.data.description}`);
                     await this.send(embedSet, opts, roomLookup, event);
                 }
             } catch (err) {
@@ -600,12 +603,11 @@ export class DiscordBot {
         // Create a new webhook if none already exists
         try {
             if (!hook) {
-                hook = await channel.createWebhook(
-                    "_matrix",
-                    {
-                        avatar: MATRIX_ICON_URL,
-                        reason: "Matrix Bridge: Allow rich user messages",
-                    });
+                hook = await channel.createWebhook({
+                    name: "_matrix",
+                    avatar: MATRIX_ICON_URL,
+                    reason: "Matrix Bridge: Allow rich user messages",
+                });
             }
         } catch (err) {
             // throw wrapError(err, Unstable.ForeignNetworkError, "Unable to create \"_matrix\" webhook");
@@ -620,7 +622,7 @@ export class DiscordBot {
      */
     public async send(
         embedSet: IMatrixEventProcessorResult,
-        opts: Discord.MessageOptions,
+        opts: Discord.MessageCreateOptions,
         roomLookup: ChannelLookupResult,
         event: IMatrixEvent,
         awaitStore: boolean = false,
@@ -638,23 +640,23 @@ export class DiscordBot {
             this.channelLock.set(chan.id);
             if (!roomLookup.canSendEmbeds) {
                 // NOTE: Don't send replies to discord if we are a puppet user.
-                msg = await chan.send(this.prepareEmbedSetUserAccount(embedSet), opts);
+                this.prepareEmbedSetUserAccount(embedSet);
+                msg = await chan.send({ ...opts, content: embedSet.messageEmbed.data.description });
             } else if (!botUser) {
-                opts.embed = this.prepareEmbedSetBotAccount(embedSet);
-                msg = await chan.send(embed.description, opts);
+                this.prepareEmbedSetUserAccount(embedSet);
+                msg = await chan.send({ ...opts, content: embedSet.messageEmbed.data.description });
             } else if (hook) {
                 MetricPeg.get.remoteCall("hook.send");
                 const embeds = this.prepareEmbedSetWebhook(embedSet);
-                msg = await hook.send(embed.description, {
-                    avatarURL: embed!.author!.iconURL,
+                msg = await hook.send({
+                    content: embed.data.description,
                     embeds,
                     files: opts.files,
-                    username: embed!.author!.name,
                     allowedMentions: { parse: ["users", "roles"] },
                 });
             } else {
-                opts.embed = this.prepareEmbedSetBot(embedSet);
-                msg = await chan.send("", opts);
+                opts.embeds = [this.prepareEmbedSetBot(embedSet).data];
+                msg = await chan.send(opts);
             }
             // Don't block on this.
             const storePromise = this.StoreMessagesSent(msg, chan, event).then(() => {
@@ -793,7 +795,7 @@ export class DiscordBot {
                 if (!channelId) return false;
                 const channel = guild.channels.cache.get(channelId);
                 if (!channel) return false;
-                if (channel.type !== "text" || !channel.members.has(member.id)) return false;
+                if (!(channel instanceof Discord.TextChannel) || !channel.members.has(member.id)) return false;
                 return true;
             });
             if (rooms.length === 0) {
@@ -801,7 +803,7 @@ export class DiscordBot {
                 throw new Error("Room(s) not found.");
             }
             const roomIds = rooms.map((room) => room.matrix!.getId());
-            this.roomIdsForGuildCache.set(`${guild.id}:${guild.member}`, {roomIds, ts: Date.now()});
+            this.roomIdsForGuildCache.set(`${guild.id}:${member.id}`, {roomIds, ts: Date.now()});
             return roomIds;
         } else {
             const rooms = await this.store.roomStore.getEntriesByRemoteRoomData({
@@ -830,7 +832,7 @@ export class DiscordBot {
             log.error("Failed to get channel for ", roomId, ex);
             return;
         }
-        if (channel.type !== "text") {
+        if (!(channel instanceof Discord.TextChannel)) {
             log.warn("Channel was not a text channel");
             return;
         }
@@ -847,9 +849,9 @@ export class DiscordBot {
         let res: Discord.Message;
         const botChannel = await this.GetChannelFromRoomId(roomId) as Discord.TextChannel;
         if (restore) {
-            await tchan.overwritePermissions([
+            await tchan.permissionOverwrites.set([
                 {
-                    allow: ["SEND_MESSAGES", "VIEW_CHANNEL"],
+                    allow: ["SendMessages", "ViewChannel"],
                     id: kickee.id,
                 }],
                 `Unbanned.`,
@@ -863,7 +865,7 @@ export class DiscordBot {
             return;
         }
         const existingPerms = tchan.permissionsFor(kickee);
-        if (existingPerms && existingPerms.has(Discord.Permissions.FLAGS.VIEW_CHANNEL as number) === false ) {
+        if (existingPerms && existingPerms.has("ViewChannel") === false ) {
             log.warn("User isn't allowed to read anyway.");
             return;
         }
@@ -877,9 +879,9 @@ export class DiscordBot {
         this.channelLock.release(botChannel.id);
         log.info(`${word} ${kickee}`);
 
-        await tchan.overwritePermissions([
+        await tchan.permissionOverwrites.set([
             {
-                deny: ["SEND_MESSAGES", "VIEW_CHANNEL"],
+                deny: ["SendMessages", "ViewChannel"],
                 id: kickee.id,
             }],
             `Matrix user was ${word} by ${kicker}.`,
@@ -888,9 +890,9 @@ export class DiscordBot {
             // Kicks will let the user back in after ~30 seconds.
             setTimeout(async () => {
                 log.info(`Kick was lifted for ${kickee.displayName}`);
-                await tchan.overwritePermissions([
+                await tchan.permissionOverwrites.set([
                     {
-                        allow: ["SEND_MESSAGES", "VIEW_CHANNEL"],
+                        allow: ["SendMessages", "ViewChannel"],
                         id: kickee.id,
                     }],
                     `Lifting kick since duration expired.`,
@@ -907,42 +909,44 @@ export class DiscordBot {
         return dbEmoji;
     }
 
-    private prepareEmbedSetUserAccount(embedSet: IMatrixEventProcessorResult): string {
+    private prepareEmbedSetUserAccount(embedSet: IMatrixEventProcessorResult) {
         const embed = embedSet.messageEmbed;
         let addText = "";
         if (embedSet.replyEmbed) {
-            for (const line of embedSet.replyEmbed.description!.split("\n")) {
+            for (const line of embedSet.replyEmbed.data.description!.split("\n")) {
                 addText += "\n> " + line;
             }
         }
-        return embed.description += addText;
+        embed.setDescription(embed.data.description + addText);
     }
 
-    private prepareEmbedSetBotAccount(embedSet: IMatrixEventProcessorResult): Discord.MessageEmbed | undefined {
+    private prepareEmbedSetBotAccount(embedSet: IMatrixEventProcessorResult): Discord.EmbedBuilder | undefined {
         if (!embedSet.imageEmbed && !embedSet.replyEmbed) {
             return undefined;
         }
-        let sendEmbed = new Discord.MessageEmbed();
+        let sendEmbed = new Discord.EmbedBuilder();
         if (embedSet.imageEmbed) {
             if (!embedSet.replyEmbed) {
                 sendEmbed = embedSet.imageEmbed;
             } else {
-                sendEmbed.setImage(embedSet.imageEmbed.image!.url);
+                sendEmbed.setImage(embedSet.imageEmbed.data.image!.url);
             }
         }
         if (embedSet.replyEmbed) {
             if (!embedSet.imageEmbed) {
                 sendEmbed = embedSet.replyEmbed;
             } else {
-                sendEmbed.addField("Replying to", embedSet.replyEmbed!.author!.name);
-                sendEmbed.addField("Reply text", embedSet.replyEmbed.description);
+                sendEmbed.addFields([
+                    { name: "Replying to", value: embedSet.replyEmbed!.data.author!.name },
+                    { name: "Reply text", value: embedSet.replyEmbed.data.description || "" },
+                ]);
             }
         }
         return sendEmbed;
     }
 
-    private prepareEmbedSetWebhook(embedSet: IMatrixEventProcessorResult): Discord.MessageEmbed[] {
-        const embeds: Discord.MessageEmbed[] = [];
+    private prepareEmbedSetWebhook(embedSet: IMatrixEventProcessorResult): Discord.EmbedBuilder[] {
+        const embeds: Discord.EmbedBuilder[] = [];
         if (embedSet.imageEmbed) {
             embeds.push(embedSet.imageEmbed);
         }
@@ -952,14 +956,16 @@ export class DiscordBot {
         return embeds;
     }
 
-    private prepareEmbedSetBot(embedSet: IMatrixEventProcessorResult): Discord.MessageEmbed {
+    private prepareEmbedSetBot(embedSet: IMatrixEventProcessorResult): Discord.EmbedBuilder {
         const embed = embedSet.messageEmbed;
         if (embedSet.imageEmbed) {
-            embed.setImage(embedSet.imageEmbed.image!.url);
+            embed.setImage(embedSet.imageEmbed.data.image!.url);
         }
         if (embedSet.replyEmbed) {
-            embed.addField("Replying to", embedSet.replyEmbed!.author!.name);
-            embed.addField("Reply text", embedSet.replyEmbed.description);
+            embed.addFields([
+                { name: "Replying to", value: embedSet.replyEmbed!.data.author!.name },
+                { name: "Reply text", value: embedSet.replyEmbed.data.description || "" },
+            ]);
         }
         return embed;
     }
@@ -967,7 +973,7 @@ export class DiscordBot {
     private async SendMatrixMessage(matrixMsg: IDiscordMessageParserResult, chan: Discord.Channel,
                                     guild: Discord.Guild, author: Discord.User,
                                     msgID: string): Promise<boolean> {
-        const rooms = await this.channelSync.GetRoomIdsFromChannel(chan);
+        const rooms = await this.channelSync.GetRoomIdsFromChannel(chan as Discord.BaseChannel);
         const intent = this.GetIntentFromDiscordMember(author);
 
         await Util.AsyncForEach(rooms, async (roomId) => {
@@ -992,7 +998,7 @@ export class DiscordBot {
     }
 
     private async OnTyping(channel: Discord.Channel, user: Discord.User|Discord.PartialUser, isTyping: boolean) {
-        const rooms = await this.channelSync.GetRoomIdsFromChannel(channel);
+        const rooms = await this.channelSync.GetRoomIdsFromChannel(channel as Discord.BaseChannel);
         try {
             const intent = this.GetIntentFromDiscordMember(user);
             await intent.ensureRegistered();
@@ -1033,10 +1039,10 @@ export class DiscordBot {
             return;
         }
         // Test for webhooks
-        if (msg.webhookID) {
+        if (msg.webhookId) {
             const webhook = (await chan.fetchWebhooks())
                             .filter((h) => h.name === "_matrix").first();
-            if (webhook && msg.webhookID === webhook.id) {
+            if (webhook && msg.webhookId === webhook.id) {
                 // Filter out our own webhook messages.
                 log.verbose("Not reflecting own webhook messages");
               // Filter out our own webhook messages.
@@ -1053,10 +1059,10 @@ export class DiscordBot {
         }
 
         // Update presence because sometimes discord misses people.
-        await this.userSync.OnUpdateUser(msg.author, Boolean(msg.webhookID));
+        await this.userSync.OnUpdateUser(msg.author, Boolean(msg.webhookId));
         let rooms: string[];
         try {
-            rooms = await this.channelSync.GetRoomIdsFromChannel(msg.channel);
+            rooms = await this.channelSync.GetRoomIdsFromChannel(msg.channel as Discord.BaseChannel);
             if (rooms === null) {
                 throw Error();
             }
@@ -1066,7 +1072,7 @@ export class DiscordBot {
             return null;
         }
         try {
-            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookID);
+            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookId);
             // stop typing
             await intent.ensureRegistered();
             rooms.map((roomId) => intent.underlyingClient.setTyping(roomId, false));
@@ -1081,7 +1087,7 @@ export class DiscordBot {
                 // on discord you can't edit in images, you can only edit text
                 // so it is safe to only check image upload stuff if we don't have
                 // an edit
-                await Util.AsyncForEach(msg.attachments.array(), async (attachment) => {
+                await Util.AsyncForEach([...msg.attachments.values()], async (attachment) => {
                     const content = await Util.DownloadFile(attachment.url);
                     const fileMime = content.mimeType || mime.getType(attachment.name || "")
                         || "application/octet-stream";
@@ -1145,7 +1151,7 @@ export class DiscordBot {
                     msgtype: result.msgtype,
                 };
                 if (msg.reference) {
-                    const storeEvent = await this.store.Get(DbEvent, {discord_id: msg.reference?.messageID})
+                    const storeEvent = await this.store.Get(DbEvent, {discord_id: msg.reference?.messageId})
                     if (storeEvent && storeEvent.Result)
                     {
                         while(storeEvent.Next())
@@ -1194,10 +1200,10 @@ export class DiscordBot {
                         log.error("Failed to send message into room.", e);
                         return;
                     }
-                    if (msg.member && !msg.webhookID) {
+                    if (msg.member && !msg.webhookId) {
                         await this.userSync.JoinRoom(msg.member, room);
                     } else {
-                        await this.userSync.JoinRoom(msg.author, room, Boolean(msg.webhookID));
+                        await this.userSync.JoinRoom(msg.author, room, Boolean(msg.webhookId));
                     }
                     res = await trySend();
                     await afterSend(res);
@@ -1237,7 +1243,7 @@ export class DiscordBot {
         }
         while (storeEvent.Next()) {
             log.info(`Deleting discord msg ${storeEvent.DiscordId}`);
-            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookID);
+            const intent = this.GetIntentFromDiscordMember(msg.author, msg.webhookId);
             await intent.ensureRegistered();
             this.userActivity.updateUserActivity(intent.userId);
             const matrixIds = storeEvent.MatrixId.split(";");

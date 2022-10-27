@@ -25,7 +25,6 @@ import { DbRoomStore, MatrixStoreRoom, RemoteStoreRoom } from "./db/roomstore";
 import { Appservice, Intent, IApplicationServiceProtocol } from "matrix-bot-sdk";
 
 const ICON_URL = "https://t2bot.io/_matrix/media/r0/download/matrix.org/mlxoESwIsTbJrfXyAAogrNxA";
-const HTTP_UNSUPPORTED = 501;
 const ROOM_NAME_PARTS = 2;
 
 // Note: The schedule must not have duplicate values to avoid problems in positioning.
@@ -112,7 +111,7 @@ export class MatrixRoomHandler {
         // Join a whole bunch of users.
         // We delay the joins to give some implementations a chance to breathe
         let delay = this.config.limits.roomGhostJoinDelay;
-        for (const member of (channel as Discord.TextChannel).members.array()) {
+        for (const member of (channel as Discord.TextChannel).members.values()) {
             if (member.id === this.discord.GetBotId()) {
                 continue;
             }
