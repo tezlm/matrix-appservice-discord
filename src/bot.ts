@@ -28,7 +28,7 @@ import { UserSyncroniser } from "./usersyncroniser";
 import { ChannelSyncroniser } from "./channelsyncroniser";
 import { MatrixRoomHandler } from "./matrixroomhandler";
 import { Log } from "./log";
-import * as Discord from "better-discord.js";
+import * as Discord from "discord.js";
 import * as mime from "mime";
 import { IMatrixEvent, IMatrixMediaInfo, IMatrixMessage } from "./matrixtypes";
 import { Appservice, Intent, MatrixClient } from "matrix-bot-sdk";
@@ -94,7 +94,6 @@ class DiscordBridgeBlocker extends BridgeBlocker {
 export class DiscordBot {
     private clientFactory: DiscordClientFactory;
     private _bot: Discord.Client|undefined;
-    private presenceInterval: number;
     private sentMessages: string[];
     private lastEventIds: { [channelId: string]: string };
     private discordMsgProcessor: DiscordMessageProcessor;
@@ -218,7 +217,9 @@ export class DiscordBot {
         if (this.config.bridge.userLimit !== null) {
             log.info(`Bridge blocker is enabled with a user limit of ${this.config.bridge.userLimit}`);
             this.bridgeBlocker = new DiscordBridgeBlocker(this.config.bridge.userLimit, this);
-            this.bridgeBlocker?.checkLimits(activeUsers);
+            this.bridgeBlocker?.checkLimits(activeUsers).catch(err => {
+                log.error(`Failed to check bridge limits: ${err}`);
+            });
         }
     }
 
@@ -515,12 +516,12 @@ export class DiscordBot {
         opts: Discord.MessageOptions,
         roomLookup: ChannelLookupResult,
         event: IMatrixEvent,
-        editEventId: string,
+        editedEventId: string,
     ): Promise<void> {
         const chan = roomLookup.channel;
         const botUser = roomLookup.botUser;
         const embed = embedSet.messageEmbed;
-        const oldMsg = await chan.messages.fetch(editEventId);
+        const oldMsg = await chan.messages.fetch(editedEventId);
         if (!oldMsg) {
             // old message not found, just sending this normally
             await this.send(embedSet, opts, roomLookup, event);
@@ -538,41 +539,79 @@ export class DiscordBot {
             } catch (err) {
                 log.warning("Failed to edit discord message, falling back to delete and resend...", err);
             }
-        }
-        try {
-            if (editEventId === this.lastEventIds[chan.id]) {
-                log.info("Immediate edit, deleting and re-sending");
-                this.channelLock.set(chan.id);
-                // we need to delete the event off of the store
-                // else the delete bridges over back to matrix
-                const dbEvent = await this.store.Get(DbEvent, { discord_id: editEventId });
-                log.verbose("Event to delete", dbEvent);
-                if (dbEvent && dbEvent.Next()) {
-                    await this.store.Delete(dbEvent);
+        } else {
+            let hook = await this.getWebhook(chan);
+            try {
+                if (hook) {
+                    // do we need to delete the event off of the store?
+                    // the edit may bridge over back to matrix otherwise
+                    const embeds = this.prepareEmbedSetWebhook(embedSet);
+                    hook.editMessage(oldMsg, {
+                        body: embed.description,
+                        avatarURL: embed!.author!.iconURL,
+                        embeds,
+                        files: opts.files,
+                        username: embed!.author!.name,
+                    })
+                    this.channelLock.release(chan.id);
+                } else {
+                    // fallback: use the old method for editing messages of
+                    // simply (re)sending them.
+                    if (editedEventId === this.lastEventIds[chan.id]) {
+                        log.info("Immediate edit, deleting and re-sending");
+                        this.channelLock.set(chan.id);
+                        // we need to delete the event off of the store
+                        // else the delete bridges over back to matrix
+                        const dbEvent = await this.store.Get(DbEvent, { discord_id: editedEventId });
+                        log.verbose("Event to delete", dbEvent);
+                        if (dbEvent && dbEvent.Next()) {
+                            await this.store.Delete(dbEvent);
+                        }
+                        await oldMsg.delete();
+                        this.channelLock.release(chan.id);
+                        const msg = await this.send(embedSet, opts, roomLookup, event, true);
+                        // we re-insert the old matrix event with the new discord id
+                        // to allow consecutive edits, as matrix edits are typically
+                        // done on the original event
+                        const dummyEvent = {
+                            event_id: event.content!["m.relates_to"].event_id,
+                            room_id: event.room_id,
+                        } as IMatrixEvent;
+                        this.StoreMessagesSent(msg, chan, dummyEvent).catch(() => {
+                            log.warn("Failed to store edit sent message for ", event.event_id);
+                        });
+                        return;
+                    }
+                    const link = `https://discord.com/channels/${chan.guild.id}/${chan.id}/${editedEventId}`;
+                    embedSet.messageEmbed.description = `[Edit](${link}): ${embedSet.messageEmbed.description}`;
+                    await this.send(embedSet, opts, roomLookup, event);
                 }
-                await oldMsg.delete();
-                this.channelLock.release(chan.id);
-                const msg = await this.send(embedSet, opts, roomLookup, event, true);
-                // we re-insert the old matrix event with the new discord id
-                // to allow consecutive edits, as matrix edits are typically
-                // done on the original event
-                const dummyEvent = {
-                    event_id: event.content!["m.relates_to"].event_id,
-                    room_id: event.room_id,
-                } as IMatrixEvent;
-                this.StoreMessagesSent(msg, chan, dummyEvent).catch(() => {
-                    log.warn("Failed to store edit sent message for ", event.event_id);
-                });
-                return;
+            } catch (err) {
+                // throw wrapError(err, Unstable.ForeignNetworkError, "Couldn't edit message");
+                log.warn(`Failed to edit message ${event.event_id}`);
+                log.verbose(err);
             }
-            const link = `https://discord.com/channels/${chan.guild.id}/${chan.id}/${editEventId}`;
-            embedSet.messageEmbed.description = `[Edit](${link}): ${embedSet.messageEmbed.description}`;
-            await this.send(embedSet, opts, roomLookup, event);
-        } catch (err) {
-            // throw wrapError(err, Unstable.ForeignNetworkError, "Couldn't edit message");
-            log.warn(`Failed to edit message ${event.event_id}`);
-            log.verbose(err);
         }
+    }
+
+    public async getWebhook(channel: Discord.TextChannel): Promise<Discord.Webhook | undefined> {
+        const webhooks = await channel.fetchWebhooks();
+        let hook: Discord.Webhook | undefined = webhooks.filter((h) => h.name === "_matrix").first();
+        // Create a new webhook if none already exists
+        try {
+            if (!hook) {
+                hook = await channel.createWebhook(
+                    "_matrix",
+                    {
+                        avatar: MATRIX_ICON_URL,
+                        reason: "Matrix Bridge: Allow rich user messages",
+                    });
+            }
+        } catch (err) {
+            // throw wrapError(err, Unstable.ForeignNetworkError, "Unable to create \"_matrix\" webhook");
+            log.warn("Unable to create _matrix webook:", err);
+        }
+        return hook
     }
 
     /**
@@ -593,22 +632,7 @@ export class DiscordBot {
         let msg: Discord.Message | null | (Discord.Message | null)[] = null;
         let hook: Discord.Webhook | undefined;
         if (botUser) {
-            const webhooks = await chan.fetchWebhooks();
-            hook = webhooks.filter((h) => h.name === "_matrix").first();
-            // Create a new webhook if none already exists
-            try {
-                if (!hook) {
-                    hook = await chan.createWebhook(
-                        "_matrix",
-                        {
-                            avatar: MATRIX_ICON_URL,
-                            reason: "Matrix Bridge: Allow rich user messages",
-                        });
-                }
-            } catch (err) {
-               // throw wrapError(err, Unstable.ForeignNetworkError, "Unable to create \"_matrix\" webhook");
-               log.warn("Unable to create _matrix webook:", err);
-            }
+            hook = await this.getWebhook(chan);
         }
         try {
             this.channelLock.set(chan.id);
@@ -1263,7 +1287,9 @@ export class DiscordBot {
             await this.store.storeUserActivity(userId, state.dataSet.users[userId]);
         }
         log.verbose(`Checking bridge limits (${state.activeUsers} active users)`);
-        this.bridgeBlocker?.checkLimits(state.activeUsers);
+        this.bridgeBlocker?.checkLimits(state.activeUsers).catch(err => {
+            log.error(`Failed to check bridge limits: ${err}`);
+        });;
         MetricPeg.get.setRemoteMonthlyActiveUsers(state.activeUsers);
     }
 }
@@ -1306,7 +1332,9 @@ class AdminNotifier {
             await this.client.inviteUser(mxid, roomId);
         } catch (err) {
             log.verbose(`Failed to invite ${mxid} to ${roomId}, cleaning up`);
-            this.client.leaveRoom(roomId); // no point awaiting it, nothing we can do if we fail
+            this.client.leaveRoom(roomId).catch(err => {
+                log.error(`Failed to clean up to-be-DM room ${roomId}: ${err}`);
+            });
             throw err;
         }
 

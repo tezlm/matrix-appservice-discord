@@ -16,7 +16,7 @@ limitations under the License.
 
 import { DiscordBridgeConfigAuth } from "./config";
 import { DiscordStore } from "./store";
-import { Client as DiscordClient, Intents, TextChannel } from "better-discord.js";
+import { Client as DiscordClient, Intents, TextChannel } from "discord.js";
 import { Log } from "./log";
 import { MetricPeg } from "./metrics";
 

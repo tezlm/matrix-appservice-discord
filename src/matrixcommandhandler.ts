@@ -20,14 +20,13 @@ import { DiscordBridgeConfig } from "./config";
 import { IMatrixEvent } from "./matrixtypes";
 import { Provisioner } from "./provisioner";
 import { Util, ICommandActions, ICommandParameters, CommandPermissonCheck } from "./util";
-import * as Discord from "better-discord.js";
+import * as Discord from "discord.js";
 import { Appservice } from "matrix-bot-sdk";
 import { IRoomStoreEntry } from "./db/roomstore";
 import * as markdown from "marked";
 const log = new Log("MatrixCommandHandler");
 
 const PROVISIONING_DEFAULT_POWER_LEVEL = 50;
-const PROVISIONING_DEFAULT_USER_POWER_LEVEL = 0;
 const ROOM_CACHE_MAXAGE_MS = 15 * 60 * 1000;
 
 export class MatrixCommandHandler {
@@ -65,7 +64,7 @@ export class MatrixCommandHandler {
                     "4. In the matrix room, send the message `!discord bridge <guild id> <channel id>` " +
                     "(without the backticks)\n" +
                     "   Note: The Guild ID and Channel ID can be retrieved from the URL in your web browser.\n" +
-                    "   The URL is formatted as https://discordapp.com/channels/GUILD_ID/CHANNEL_ID\n" +
+                    "   The URL is formatted as https://discord.com/channels/GUILD_ID/CHANNEL_ID\n" +
                     "5. Enjoy your new bridge!",
                 /* eslint-enable prefer-template */
                 params: ["guildId", "channelId"],

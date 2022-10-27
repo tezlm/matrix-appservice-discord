@@ -1,13 +1,18 @@
-FROM node:14-alpine AS BUILD
+FROM node:16-slim AS BUILD
 COPY . /tmp/src
 # install some dependencies needed for the build process
+<<<<<<< HEAD
 RUN apk update
 RUN apk add --no-cache -t build-deps make gcc g++ python3 ca-certificates libc-dev wget git
+=======
+RUN apt update && apt install -y build-essential make gcc g++ python3 ca-certificates libc-dev wget git
+
+>>>>>>> 749c0f0c2bc269927fdbafd9eb04a47f2e019128
 RUN cd /tmp/src \
     && yarn install \
     && yarn build
 
-FROM node:14-alpine
+FROM node:16-slim
 ENV NODE_ENV=production
 COPY --from=BUILD /tmp/src/build /build
 COPY --from=BUILD /tmp/src/config /config

@@ -38,6 +38,10 @@ jspm_packages
 # Optional npm cache directory
 .npm
 
+# Optional local Yarn settings
+.yarn
+.yarnrc
+
 # Optional REPL history
 .node_repl_history
 
@@ -50,5 +54,13 @@ build
 *.db
 *.db.backup
 
+<<<<<<< HEAD
 # lagfest artifact
 /test
+=======
+.vscode/
+*.code-workspace
+
+# Local History for Visual Studio Code
+.history/
+>>>>>>> 749c0f0c2bc269927fdbafd9eb04a47f2e019128
