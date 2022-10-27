@@ -95,7 +95,7 @@ export class MatrixMessageProcessor {
                 return match && match[1] || null;
             },
             getEmoji: async (mxc: string, name: string) => {
-                let emoji: {id: string, animated: boolean, name: string} | null = null;
+                let emoji: Discord.GuildEmoji | null = null;
                 try {
                     const emojiDb = await this.bot.GetEmojiByMxc(mxc);
                     const id = emojiDb.EmojiId;
@@ -106,7 +106,14 @@ export class MatrixMessageProcessor {
                 if (!emoji) {
                     emoji = guild.emojis.resolve(name);
                 }
-                return emoji;
+                if (!emoji) {
+                    return null;
+                }
+                return {
+                    id: emoji.id,
+                    animated: emoji.animated || false,
+                    name: emoji.name || "unnamed",
+                };
             },
             getUserId: async (mxid: string) => {
                 const USER_REGEX = /^@_discord_([0-9]*)/;

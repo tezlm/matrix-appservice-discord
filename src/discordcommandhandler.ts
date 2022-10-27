@@ -100,7 +100,7 @@ export class DiscordCommandHandler {
             name: {
                 description: "The display name or mxid of a matrix user",
                 get: async (name) => {
-                    const channelMxids = await this.discord.ChannelSyncroniser.GetRoomIdsFromChannel(msg.channel);
+                    const channelMxids = await this.discord.ChannelSyncroniser.GetRoomIdsFromChannel(msg.channel as Discord.BaseChannel);
                     const mxUserId = await Util.GetMxidFromName(intent, name, channelMxids);
                     return mxUserId;
                 },
@@ -111,7 +111,7 @@ export class DiscordCommandHandler {
             if (!Array.isArray(permission)) {
                 permission = [permission];
             }
-            return permission.every((p) => discordMember.hasPermission(p as Discord.PermissionResolvable));
+            return permission.every((p) => discordMember.permissions.has(p as Discord.PermissionResolvable));
         };
 
         const reply = await Util.ParseCommand("!matrix", msg.content, actions, parameters, permissionCheck);

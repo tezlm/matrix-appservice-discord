@@ -36,7 +36,7 @@ export class DiscordMessageProcessor {
         const opts = {
             callbacks: this.getParserCallbacks(msg),
         } as IDiscordMessageParserOpts;
-        return await this.parser.FormatMessage(opts, msg);
+        return await this.parser.FormatMessage(opts, msg as any);
     }
 
     public async FormatEdit(
@@ -48,7 +48,7 @@ export class DiscordMessageProcessor {
         const opts = {
             callbacks: this.getParserCallbacks(msg2),
         } as IDiscordMessageParserOpts;
-        return await this.parser.FormatEdit(opts, msg1, msg2, link);
+        return await this.parser.FormatEdit(opts, msg1 as any, msg2 as any, link);
     }
 
     private getParserCallbacks(msg: Discord.Message): IDiscordMessageParserCallbacks {

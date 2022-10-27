@@ -53,9 +53,9 @@ export class MatrixEventProcessorOpts {
 }
 
 export interface IMatrixEventProcessorResult {
-    messageEmbed: Discord.MessageEmbed;
-    replyEmbed?: Discord.MessageEmbed;
-    imageEmbed?: Discord.MessageEmbed;
+    messageEmbed: Discord.EmbedBuilder;
+    replyEmbed?: Discord.EmbedBuilder;
+    imageEmbed?: Discord.EmbedBuilder;
 }
 
 export class MatrixEventProcessor {
@@ -196,14 +196,14 @@ export class MatrixEventProcessor {
         }
 
         const embedSet = await this.EventToEmbed(event, chan);
-        const opts: Discord.MessageOptions = {};
+        const opts: Discord.MessageCreateOptions = { embeds: [] };
         const file = await this.HandleAttachment(event, mxClient, roomLookup.canSendEmbeds);
-        if (typeof(file) === "string") {
-            embedSet.messageEmbed.description += " " + file;
-        } else if ((file as Discord.FileOptions).name && (file as Discord.FileOptions).attachment) {
-            opts.files = [file as Discord.FileOptions];
-        } else {
-            embedSet.imageEmbed = file as Discord.MessageEmbed;
+        if (typeof file === "string") {
+            embedSet.messageEmbed.setDescription(embedSet.messageEmbed.data.description + " " + file);
+        } else if (file.files) {
+            opts.files = file.files;
+        } else if (file.embeds) {
+            opts.embeds!.push(...file.embeds);
         }
 
         // Throws an `Unstable.ForeignNetworkError` when sending the message fails.
@@ -265,7 +265,7 @@ export class MatrixEventProcessor {
             } else if (membership === "invite" && allowInvite) {
                 msg += `invited \`${event.state_key}\` to the room`;
             } else if (membership === "leave" && event.state_key !== event.sender) {
-                const banUnban = event.unsigned?.prev_content?.membership === "ban" ? "unbanned" : "kicked";
+                const banUnban = (event.unsigned as any)?.prev_content?.membership === "ban" ? "unbanned" : "kicked";
                 msg += `${banUnban} \`${event.state_key}\` from the room`;
             } else if (membership === "leave" && allowJoinLeave) {
                 msg += "left the room";
@@ -305,17 +305,18 @@ export class MatrixEventProcessor {
             body = await this.matrixMsgProcessor.FormatMessage(content as IMatrixMessage, channel.guild, params);
         }
 
-        const messageEmbed = new Discord.MessageEmbed();
+        const messageEmbed = new Discord.EmbedBuilder();
         // messageEmbed.setDescription(this.HasAttachment(event) ? "" : body);
         messageEmbed.setDescription(body);
         await this.SetEmbedAuthor(messageEmbed, event.sender, profile);
         const replyEmbed = getReply ? (await this.GetEmbedForReply(event, channel)) : undefined;
-        if (replyEmbed && replyEmbed.fields) {
-            for (let i = 0; i < replyEmbed.fields.length; i++) {
-                const f = replyEmbed.fields[i];
+        if (replyEmbed && replyEmbed.data.fields) {
+            for (let i = 0; i < replyEmbed.data.fields.length; i++) {
+                const f = replyEmbed.data.fields[i];
                 if (f.name === "ping") {
-                    messageEmbed.description += `\n(${f.value})`;
-                    replyEmbed.fields.splice(i, 1);
+                    messageEmbed.setDescription(`\n(${f.value})`);
+                    const fields = [...replyEmbed.data.fields];
+                    replyEmbed.setFields([...fields.slice(0, i - 1), ...fields.slice(i)]);
                     break;
                 }
             }
@@ -330,7 +331,7 @@ export class MatrixEventProcessor {
         event: IMatrixEvent,
         mxClient: MatrixClient,
         sendEmbeds: boolean = false,
-    ): Promise<string|Discord.FileOptions|Discord.MessageEmbed> {
+    ): Promise<string|Discord.MessageCreateOptions> {
         if (!this.HasAttachment(event)) {
             return "";
         }
@@ -358,14 +359,14 @@ export class MatrixEventProcessor {
             size = attachment.byteLength;
             if (size < MaxFileSize) {
                 return {
-                    attachment,
-                    name,
-                } as Discord.FileOptions;
+                    files: [attachment],
+                };
             }
         }
         if (sendEmbeds && event.content.info.mimetype.split("/")[0] === "image") {
-            return new Discord.MessageEmbed()
-                .setImage(url);
+            return {
+                embeds: [new Discord.EmbedBuilder().setImage(url)],
+            }
         }
         return `[${name}](${url})`;
     }
@@ -373,7 +374,7 @@ export class MatrixEventProcessor {
     public async GetEmbedForReply(
         event: IMatrixEvent,
         channel: Discord.TextChannel,
-    ): Promise<Discord.MessageEmbed|undefined> {
+    ): Promise<Discord.EmbedBuilder|undefined> {
         if (!event.content) {
             event.content = {};
         }
@@ -398,7 +399,7 @@ export class MatrixEventProcessor {
             // if we reply to a discord member, ping them!
             if (this.bridge.isNamespacedUser(sourceEvent.sender)) {
                 const uid = this.bridge.getSuffixForUserId(sourceEvent.sender);
-                replyEmbed.addField("ping", `<@${uid}>`);
+                replyEmbed.addFields([{ name: "ping", value: `<@${uid}>` }]);
             }
 
             replyEmbed.setTimestamp(new Date(sourceEvent.origin_server_ts!));
@@ -411,7 +412,7 @@ export class MatrixEventProcessor {
                     replyEmbed.setImage(url);
                 } else {
                     const name = this.GetFilenameForMediaEvent(sourceEvent.content!);
-                    replyEmbed.description = `[${name}](${url})`;
+                    replyEmbed.setDescription(`[${name}](${url})`);
                 }
             }
             return replyEmbed;
@@ -419,9 +420,9 @@ export class MatrixEventProcessor {
             log.warn("Failed to handle reply, showing a unknown embed:", ex);
         }
         // For some reason we failed to get the event, so using fallback.
-        const embed = new Discord.MessageEmbed();
+        const embed = new Discord.EmbedBuilder();
         embed.setDescription("Reply with unknown content");
-        embed.setAuthor("Unknown");
+        embed.setAuthor({ name: "Unknown" });
         return embed;
     }
 
@@ -490,7 +491,7 @@ export class MatrixEventProcessor {
         return hasAttachment;
     }
 
-    private async SetEmbedAuthor(embed: Discord.MessageEmbed, sender: string, profile?: {
+    private async SetEmbedAuthor(embed: Discord.EmbedBuilder, sender: string, profile?: {
         displayname: string,
         avatar_url: string|undefined }) {
         let displayName = sender;
@@ -501,16 +502,16 @@ export class MatrixEventProcessor {
             const localpart = Util.ParseMxid(sender).localpart;
             const userOrMember = await this.discord.GetDiscordUserOrMember(localpart.substring("_discord".length));
             if (userOrMember instanceof Discord.User) {
-                embed.setAuthor(
-                    userOrMember.username,
-                    userOrMember.avatarURL({ format: 'png' }) || undefined,
-                );
+                embed.setAuthor({
+                    name: userOrMember.username,
+                    iconURL: userOrMember.avatarURL({ extension: 'png' }) || undefined,
+                });
                 return;
             } else if (userOrMember instanceof Discord.GuildMember) {
-                embed.setAuthor(
-                    userOrMember.displayName,
-                    userOrMember.user.avatarURL({ format: 'png' }) || undefined,
-                );
+                embed.setAuthor({
+                    name: userOrMember.displayName,
+                    iconURL: userOrMember.avatarURL({ extension: 'png' }) || undefined,
+                });
                 return;
             }
             // Let it fall through.
@@ -532,11 +533,11 @@ export class MatrixEventProcessor {
                 );
             }
         }
-        embed.setAuthor(
-            displayName.substring(0, MAX_NAME_LENGTH),
-            avatarUrl,
-            `https://matrix.to/#/${sender}`,
-        );
+        embed.setAuthor({
+            name: displayName.substring(0, MAX_NAME_LENGTH),
+            iconURL: avatarUrl,
+            url: `https://matrix.to/#/${sender}`,
+        });
     }
 
     private GetFilenameForMediaEvent(content: IMatrixEventContent): string {

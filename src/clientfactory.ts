@@ -16,7 +16,7 @@ limitations under the License.
 
 import { DiscordBridgeConfigAuth } from "./config";
 import { DiscordStore } from "./store";
-import { Client as DiscordClient, Intents, TextChannel } from "discord.js";
+import { Client as DiscordClient, TextChannel, IntentsBitField } from "discord.js";
 import { Log } from "./log";
 import { MetricPeg } from "./metrics";
 
@@ -40,11 +40,7 @@ export class DiscordClientFactory {
         // We just need to make sure we have a bearer token.
         // Create a new Bot client.
         this.botClient = new DiscordClient({
-            fetchAllMembers: this.config.usePrivilegedIntents,
-            messageCacheLifetime: 5,
-            ws: {
-                intents: this.config.usePrivilegedIntents ? Intents.ALL : Intents.NON_PRIVILEGED,
-            },
+            intents: ["GuildPresences", "GuildEmojisAndStickers", "GuildMessageReactions", "GuildMessages", "GuildWebhooks", "GuildMembers", "Guilds", "GuildMessageTyping"],
             shardCount: this.config.shards,
         });
 
@@ -54,7 +50,7 @@ export class DiscordClientFactory {
         });
 
         try {
-            await this.botClient.login(this.config.botToken, true);
+            await this.botClient.login(this.config.botToken);
             log.info("Waiting for shardReady signal");
             await waitPromise;
             log.info("Got shardReady signal");
@@ -67,14 +63,10 @@ export class DiscordClientFactory {
 
     public async getDiscordId(token: string): Promise<string> {
         const client = new DiscordClient({
-            fetchAllMembers: false,
-            messageCacheLifetime: 5,
-            ws: {
-                intents: Intents.NON_PRIVILEGED,
-            },
+            intents: []
         });
 
-        await client.login(token, false);
+        await client.login(token);
         const id = client.user?.id;
         client.destroy();
         if (!id) {
@@ -100,11 +92,7 @@ export class DiscordClientFactory {
         // TODO: Select a profile based on preference, not the first one.
         const token = await this.store.getToken(discordIds[0]);
         const client = new DiscordClient({
-            fetchAllMembers: false,
-            messageCacheLifetime: 5,
-            ws: {
-                intents: Intents.NON_PRIVILEGED,
-            },
+            intents: []
         });
 
         const jsLog = new Log("discord.js-ppt");
@@ -113,7 +101,7 @@ export class DiscordClientFactory {
         client.on("warn", (msg) => { jsLog.warn(msg); });
 
         try {
-            await client.login(token, false);
+            await client.login(token);
             log.verbose("Logged in. Storing ", userId);
             this.clients.set(userId, client);
             return client;

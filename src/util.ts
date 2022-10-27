@@ -17,7 +17,7 @@ limitations under the License.
 import * as http from "http";
 import * as https from "https";
 import { Buffer } from "buffer";
-import { Permissions } from "discord.js";
+import { PermissionsBitField } from "discord.js";
 import { DiscordBridgeConfig } from "./config";
 import { IMatrixEvent } from "./matrixtypes";
 
@@ -108,15 +108,16 @@ export class Util {
 
     public static GetBotLink(config: DiscordBridgeConfig): string {
         /* tslint:disable:no-bitwise */
-        const perms = Permissions.FLAGS.SEND_MESSAGES! |
-            Permissions.FLAGS.CHANGE_NICKNAME! |
-            Permissions.FLAGS.CONNECT! |
-            Permissions.FLAGS.SPEAK! |
-            Permissions.FLAGS.EMBED_LINKS! |
-            Permissions.FLAGS.ATTACH_FILES! |
-            Permissions.FLAGS.READ_MESSAGE_HISTORY! |
-            Permissions.FLAGS.MANAGE_WEBHOOKS! |
-            Permissions.FLAGS.MANAGE_MESSAGES!;
+        const flags = PermissionsBitField.Flags;
+        const perms = flags.SendMessages |
+            flags.ChangeNickname |
+            flags.Connect |
+            flags.Speak |
+            flags.EmbedLinks |
+            flags.AttachFiles |
+            flags.ReadMessageHistory |
+            flags.ManageWebhooks |
+            flags.ManageMessages;
         /* tslint:enable:no-bitwise */
 
         const clientId = config.auth.clientID;
